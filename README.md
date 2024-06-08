@@ -25,6 +25,12 @@
 # SerenityJS Docker
 Here's where you'll find Docker images for SerenityJS, set up for different Linux flavors. Perfect for running locally or in production!
 
+## Prerequisites
+Before you begin, ensure you have met the following requirements:
+- You have a Linux, macOS, or Windows machine.
+- You have Docker installed on your machine. If not, you can download and install Docker from [here](https://docs.docker.com/get-docker/).
+
+---
 
 ## Quick Start
 ```sh
@@ -32,4 +38,4 @@ docker run ghcr.io/serenityjs/serenity-docker:latest -it --name serenityjs-docke
 ```
 
 > [!NOTE]
-> For any questions related to SerenityJS and our docker containers head to our [discord](https://discord.gg/jUcC3q59zg).
+> For any questions related to SerenityJS and our docker containers, head to our [discord](https://discord.gg/jUcC3q59zg).
