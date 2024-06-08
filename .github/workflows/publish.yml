@@ -2,7 +2,9 @@ name: Create and publish Docker images
 
 on:
   push:
-    branches: ['release']
+    branches: ['develop']
+    paths:
+      - 'build.json'
 
 env:
   REGISTRY: ghcr.io
@@ -41,7 +43,7 @@ jobs:
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
       - name: Adjust permissions for entrypoint
-        run: chmod +x images/entrypoint.sh
+        run: chmod +x image/entrypoint.sh
 
       - name: Build and push Docker images
         run: |
@@ -49,18 +51,6 @@ jobs:
           IMAGE_TAG=${{ env.VERSION }}
           
           echo "Building and pushing $IMAGE_NAME with tags $IMAGE_TAG and latest"
-          docker build -t ${{ env.REGISTRY }}/${REPO_NAME}:${IMAGE_TAG} -t ${{ env.REGISTRY }}/${REPO_NAME}:latest images/
+          docker build -t ${{ env.REGISTRY }}/${REPO_NAME}:${IMAGE_TAG} -t ${{ env.REGISTRY }}/${REPO_NAME}:latest image/
           docker push ${{ env.REGISTRY }}/${REPO_NAME}:${IMAGE_TAG}
           docker push ${{ env.REGISTRY }}/${REPO_NAME}:latest
-
-      - name: Generate artifact attestations for Docker images
-        run: |
-          REPO_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          IMAGE_TAG=${{ env.VERSION }}
-          
-          echo "Generating attestation for $IMAGE_NAME"
-          IMAGE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${REPO_NAME}:${IMAGE_TAG})
-          echo "Image: ${{ env.REGISTRY }}/${REPO_NAME}:${IMAGE_TAG}" > attestation.txt
-          echo "Digest: ${IMAGE_DIGEST}" >> attestation.txt
-          
-          gh actions upload-artifact --name $IMAGE_NAME-attestation --path attestation.txt
