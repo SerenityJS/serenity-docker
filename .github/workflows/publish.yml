@@ -1,0 +1,66 @@
+name: Create and publish Docker images
+
+on:
+  push:
+    branches: ['release']
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: debian
+
+jobs:
+  build-and-push-images:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Extract version from build.json
+        id: extract_version
+        run: |
+          VERSION=$(jq -r '.latest' build.json)
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+      - name: Adjust permissions for entrypoint
+        run: chmod +x images/entrypoint.sh
+
+      - name: Build and push Docker images
+        run: |
+          REPO_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_TAG=${{ env.VERSION }}
+          
+          echo "Building and pushing $IMAGE_NAME with tags $IMAGE_TAG and latest"
+          docker build -t ${{ env.REGISTRY }}/${REPO_NAME}:${IMAGE_TAG} -t ${{ env.REGISTRY }}/${REPO_NAME}:latest images/
+          docker push ${{ env.REGISTRY }}/${REPO_NAME}:${IMAGE_TAG}
+          docker push ${{ env.REGISTRY }}/${REPO_NAME}:latest
+
+      - name: Generate artifact attestations for Docker images
+        run: |
+          REPO_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_TAG=${{ env.VERSION }}
+          
+          echo "Generating attestation for $IMAGE_NAME"
+          IMAGE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${{ env.REGISTRY }}/${REPO_NAME}:${IMAGE_TAG})
+          echo "Image: ${{ env.REGISTRY }}/${REPO_NAME}:${IMAGE_TAG}" > attestation.txt
+          echo "Digest: ${IMAGE_DIGEST}" >> attestation.txt
+          
+          gh actions upload-artifact --name $IMAGE_NAME-attestation --path attestation.txt
