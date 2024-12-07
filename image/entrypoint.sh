@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 term_handler() {
    timestamp=$(date "+%m-%d-%Y %H:%M:%S")
@@ -12,6 +12,6 @@ term_handler() {
 
 trap 'term_handler' SIGTERM
 
-/serenity/start.sh &
+npm run dev &
 
 wait $!

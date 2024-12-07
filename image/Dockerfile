@@ -1,4 +1,4 @@
-FROM debian:stable-slim
+FROM node:22.12.0-bookworm-slim
 
 LABEL author="ReallyFatYoshi <github.com/ReallyFatYoshi>"
 LABEL org.opencontainers.image.source="https://github.com/SerenityJS/docker"
@@ -9,18 +9,6 @@ LABEL org.opencontainers.image.licenses="MIT"
 ENV SERENITY_BRANCH="BETA"
 ENV SERENITY_TEMPLATE="TYPESCRIPT"
 
-# Install necessary packages and clean up in one layer
-RUN apt-get update && \
-    apt-get install -y nodejs npm && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# Create Serenity user and group
-RUN groupadd -r serenity && \
-    useradd -r -g serenity -m serenity && \
-    mkdir /serenity && \
-    chown serenity:serenity /serenity
-
 # Expose UDP port
 EXPOSE 19132/udp
 
@@ -30,19 +18,14 @@ WORKDIR /serenity
 # Copy all files into /serenity
 COPY . .
 
-# Set ownership and permissions for entrypoint.sh
-RUN chown serenity:serenity /serenity/entrypoint.sh && \
-    chmod +x /serenity/entrypoint.sh
+# Change permissions for entrypoint.sh
+RUN chmod +x /serenity/entrypoint.sh
 
-# Run setup script as Serenity user in /serenity directory
-RUN chown -R serenity:serenity /serenity && \
-    su serenity -c "node setup.js"
+# Run setup script
+RUN node setup.js
 
-# Un-used necessary files
+# Remove unnecessary files
 RUN rm -rf /serenity/setup.js /serenity/start.bat
 
-# Switch to the Serenity user
-USER serenity
-
 # Set the entrypoint to run your application as Serenity from /serenity directory
-ENTRYPOINT ["/bin/bash", "-c", "/serenity/entrypoint.sh"]
+ENTRYPOINT ["/bin/sh", "-c", "/serenity/entrypoint.sh"]

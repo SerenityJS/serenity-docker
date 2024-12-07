@@ -11,23 +11,18 @@ const KEYBOARD = {
   ARROW_RIGHT: '\x1b[C',
 };
 
-// Spawn the `npm create serenity` process
 const child = spawn('npm', ['create', 'serenity', '--yes'], { stdio: 'pipe' });
 
 let answerIndex = 0;
 let outputBuffer = '';
 
-// Function to handle the response
 function handlePrompt() {
-  // Match the prompt patterns and respond
   if (outputBuffer.includes("What would you like to name your project?") && answerIndex === 0) {
-    // Text input answer for the project name
     child.stdin.write(`app\n`);
     answerIndex++;
   }
 
   if (outputBuffer.includes("What branch of SerenityJS would you like to use?") && answerIndex === 1) {
-    // Handle "What branch of SerenityJS would you like to use?" prompt with arrow keys
     if (process.env.SERENITY_BRANCH !== "LATEST") {
       child.stdin.write(KEYBOARD.ARROW_DOWN);
     }

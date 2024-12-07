@@ -1,5 +1,5 @@
 services:
-  serenitjs:
+  serenityjs:
     restart: always
     build:
       context: image
