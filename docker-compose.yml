@@ -1,0 +1,6 @@
+services:
+  serenitjs:
+    restart: always
+    build:
+      context: image
+      dockerfile: Dockerfile

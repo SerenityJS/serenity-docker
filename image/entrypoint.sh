@@ -12,6 +12,6 @@ term_handler() {
 
 trap 'term_handler' SIGTERM
 
-/root/serenityjs-linux &
+/serenity/start.sh &
 
 wait $!
