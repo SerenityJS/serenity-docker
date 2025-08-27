@@ -1,56 +1,62 @@
-name: Create and publish Docker images
+name: Publish Docker image to GHCR
 
 on:
-  push:
-    branches: ['develop']
-    paths:
-      - 'build.json'
+  release:
+    types: [published]  # fires when a GitHub Release is published
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: debian
+permissions:
+  contents: read
+  packages: write        # needed to push to ghcr.io
 
 jobs:
-  build-and-push-images:
+  push:
+    # Skip beta/rc pre-releases
+    if: ${{ github.event.release.prerelease == false }}
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-      attestations: write
-      id-token: write
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up jq
-        run: sudo apt-get update && sudo apt-get install -y jq
+      - name: Compute image repo (lowercase owner)
+        run: |
+          OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_REPO=ghcr.io/${OWNER_LC}/serenity" >> $GITHUB_ENV
 
-      - name: Log in to the Container registry
-        uses: docker/login-action@v2
+      - name: Set up QEMU (for multi-arch)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+      - name: Docker metadata (tags + labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_REPO }}
+          # Tag with the release tag, and also "latest" on main if you want
+          tags: |
+            type=raw,value=${{ github.event.release.tag_name }}
+            type=raw,value=latest,enable={{is_default_branch}}
+          labels: |
+            org.opencontainers.image.source=${{ github.repository }}
+            org.opencontainers.image.description=SerenityJS docker image for debian.
 
-      - name: Extract version from build.json
-        id: extract_version
-        run: |
-          VERSION=$(jq -r '.latest' build.json)
-          echo "VERSION=${VERSION}" >> $GITHUB_ENV
-
-      - name: Adjust permissions for entrypoint
-        run: chmod +x image/entrypoint.sh
-
-      - name: Build and push Docker images
-        run: |
-          REPO_NAME=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          IMAGE_TAG=${{ env.VERSION }}
-          
-          echo "Building and pushing $IMAGE_NAME with tags $IMAGE_TAG and latest"
-          docker build -t ${{ env.REGISTRY }}/${REPO_NAME}:${IMAGE_TAG} -t ${{ env.REGISTRY }}/${REPO_NAME}:latest image/
-          docker push ${{ env.REGISTRY }}/${REPO_NAME}:${IMAGE_TAG}
-          docker push ${{ env.REGISTRY }}/${REPO_NAME}:latest
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
