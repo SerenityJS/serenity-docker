@@ -32,34 +32,40 @@ jobs:
         id: vars
         shell: bash
         run: |
-          # matrix.platform looks like "linux/amd64" or "linux/arm64"
-          ARCH="${{ matrix.platform }}"     # -> amd64 or arm64
+          # matrix.platform is like "linux/amd64" → take the part after the slash
+          ARCH="${{ matrix.platform }}"             # -> amd64 or arm64
           echo "ARCH=$ARCH" >> "$GITHUB_OUTPUT"
+          OUT_TAR="/tmp/out/serenityjs-$ARCH.tar"
+          echo "OUT_TAR=$OUT_TAR" >> "$GITHUB_OUTPUT"
           mkdir -p /tmp/out
 
-      - name: Build image → tar (single-platform)
+      - name: Build image → temp tar (single-platform)
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
-          platforms: ${{ matrix.platform }}   # keep full platform here (OK)
+          platforms: ${{ matrix.platform }}   # full platform is fine here
           push: false
-          # ✅ VALID tags (no slashes in the tag part)
+          # Clean tags (NO slashes)
           tags: |
-            serenityjs:latest
+            serenityjs
             serenityjs:${{ steps.vars.outputs.ARCH }}
-          # ✅ VALID output path (no slashes from platform)
-          outputs: type=docker,dest=/tmp/out/serenityjs-${{ steps.vars.outputs.ARCH }}.tar
+          # Export to a SAFE, constant file (avoid slashes in path)
+          outputs: type=docker,dest=/tmp/image.tar
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Verify tar exists
+      - name: Move tar to arch-specific name
+        shell: bash
+        run: mv /tmp/image.tar "${{ steps.vars.outputs.OUT_TAR }}"
+
+      - name: Verify output
         run: ls -l /tmp/out
 
       - name: Upload image tar
         uses: actions/upload-artifact@v4
         with:
           name: serenityjs-image-${{ steps.vars.outputs.ARCH }}
-          path: /tmp/out/serenityjs-${{ steps.vars.outputs.ARCH }}.tar
+          path: ${{ steps.vars.outputs.OUT_TAR }}
           compression-level: 0
           retention-days: 7
