@@ -1,0 +1,57 @@
+name: Create GitHub Release
+
+on:
+  push:
+    tags:
+      - 'v*'                # push a tag like v1.2.3
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v1.2.3)'
+        required: true
+      target:
+        description: 'Target commit/branch for the tag'
+        required: false
+        default: main
+      prerelease:
+        description: 'Mark as pre-release'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write           # needed to create the release (and tag if missing)
+
+jobs:
+  release:
+    # If triggered by a tag push, skip tags that look like pre-releases (contain '-')
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (startsWith(github.ref, 'refs/tags/') && !contains(github.ref_name, '-'))
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute release vars
+        id: vars
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "TAG=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+            echo "TARGET=${{ github.event.inputs.target }}" >> $GITHUB_OUTPUT
+            echo "PRERELEASE=${{ github.event.inputs.prerelease }}" >> $GITHUB_OUTPUT
+          else
+            echo "TAG=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+            echo "TARGET=${GITHUB_SHA}" >> $GITHUB_OUTPUT
+            echo "PRERELEASE=false" >> $GITHUB_OUTPUT
+          fi
+
+      # Creates the tag (if missing) and the GitHub Release, with auto-generated notes
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.vars.outputs.TAG }}
+          target_commitish: ${{ steps.vars.outputs.TARGET }}
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ steps.vars.outputs.PRERELEASE }}
