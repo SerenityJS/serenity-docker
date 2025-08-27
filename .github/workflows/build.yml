@@ -28,36 +28,49 @@ jobs:
       - name: Setup Buildx
         uses: docker/setup-buildx-action@v3
 
+      # Derive a slash-free arch string and prepare output dir
       - name: Derive ARCH and prepare out dir
         id: vars
         shell: bash
         run: |
-          # matrix.platform is like "linux/amd64" → take the part after the slash
-          ARCH="${{ matrix.platform }}"             # -> amd64 or arm64
+          ARCH="${{ matrix.platform }}"   # "linux/amd64" -> "amd64"
           echo "ARCH=$ARCH" >> "$GITHUB_OUTPUT"
-          OUT_TAR="/tmp/out/serenityjs-$ARCH.tar"
-          echo "OUT_TAR=$OUT_TAR" >> "$GITHUB_OUTPUT"
           mkdir -p /tmp/out
 
-      - name: Build image → temp tar (single-platform)
+      # Generate VALID tags (no slashes) using metadata-action
+      - name: Docker metadata (tags)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: serenityjs
+          tags: |
+            type=raw,value=latest
+            type=raw,value=${{ steps.vars.outputs.ARCH }}
+
+      # Optional: sanity check to fail fast if any tag has a slash
+      - name: Check tags contain no slashes
+        shell: bash
+        run: |
+          echo "Tags:"
+          echo "${{ steps.meta.outputs.tags }}"
+          if echo "${{ steps.meta.outputs.tags }}" | grep -q '/'; then
+            echo "ERROR: A tag contains '/'."
+            exit 1
+          fi
+
+      - name: Build image → tar (single-platform)
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
-          platforms: ${{ matrix.platform }}   # full platform is fine here
+          platforms: ${{ matrix.platform }}     # OK to use full platform here
           push: false
-          # Clean tags (NO slashes)
-          tags: |
-            serenityjs
-            serenityjs:${{ steps.vars.outputs.ARCH }}
-          # Export to a SAFE, constant file (avoid slashes in path)
-          outputs: type=docker,dest=/tmp/image.tar
+          # Use the tags computed above (latest + amd64/arm64)
+          tags: ${{ steps.meta.outputs.tags }}
+          # Export to a fixed, safe file (no slashes)
+          outputs: type=docker,dest=/tmp/out/serenityjs-${{ steps.vars.outputs.ARCH }}.tar
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: Move tar to arch-specific name
-        shell: bash
-        run: mv /tmp/image.tar "${{ steps.vars.outputs.OUT_TAR }}"
 
       - name: Verify output
         run: ls -l /tmp/out
@@ -66,6 +79,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: serenityjs-image-${{ steps.vars.outputs.ARCH }}
-          path: ${{ steps.vars.outputs.OUT_TAR }}
+          path: /tmp/out/serenityjs-${{ steps.vars.outputs.ARCH }}.tar
           compression-level: 0
           retention-days: 7
