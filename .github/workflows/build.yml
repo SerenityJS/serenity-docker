@@ -30,9 +30,15 @@ jobs:
 
       - name: Derive ARCH and prepare out dir
         id: vars
+        shell: bash
         run: |
-          ARCH="${{ matrix.platform }}"   # linux/amd64 -> amd64
-          echo "ARCH=$ARCH" >> $GITHUB_OUTPUT
+          # Extract just the arch (linux/amd64 -> amd64)
+          ARCH="${{ matrix.platform }}"
+          echo "ARCH=$ARCH" >> "$GITHUB_OUTPUT"
+          # Optional: also a hyphenated platform (linux/amd64 -> linux-amd64) if you ever want it
+          PF="${{ matrix.platform }}"
+          PF="${PF//\//-}"
+          echo "PLATFORM_HYPHEN=$PF" >> "$GITHUB_OUTPUT"
           mkdir -p /tmp/out
 
       - name: Build image → tar (single-platform)
@@ -42,11 +48,11 @@ jobs:
           file: ./Dockerfile
           platforms: ${{ matrix.platform }}
           push: false
-          # Image names baked into the tar
+          # Give the image a stable name/tag INSIDE the tar
           tags: |
             serenityjs:latest
             serenityjs:${{ steps.vars.outputs.ARCH }}
-          # One tar per arch, loadable via `docker load -i`
+          # IMPORTANT: no slashes in dest filename
           outputs: type=docker,dest=/tmp/out/serenityjs-${{ steps.vars.outputs.ARCH }}.tar
           cache-from: type=gha
           cache-to: type=gha,mode=max
