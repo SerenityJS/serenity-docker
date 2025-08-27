@@ -31,7 +31,7 @@ jobs:
       - name: Derive ARCH and prepare out dir
         id: vars
         run: |
-          ARCH="${{ matrix.platform##*/ }}"   # linux/amd64 -> amd64
+          ARCH="${{ matrix.platform }}"   # linux/amd64 -> amd64
           echo "ARCH=$ARCH" >> $GITHUB_OUTPUT
           mkdir -p /tmp/out
 
