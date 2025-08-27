@@ -1,0 +1,49 @@
+name: Build Docker image (CI)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ linux/amd64, linux/arm64 ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image → tar (single-platform)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: ${{ matrix.platform }}
+          push: false
+          # Export a docker-archive tar that you can `docker load`
+          outputs: type=docker,dest=/tmp/serenity-${{ matrix.platform }}.tar
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Upload image tar
+        uses: actions/upload-artifact@v4
+        with:
+          name: serenity-image-${{ matrix.platform }}
+          path: /tmp/serenity-${{ matrix.platform }}.tar
+          compression-level: 0
+          retention-days: 7
