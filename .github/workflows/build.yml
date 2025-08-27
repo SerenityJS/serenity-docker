@@ -31,8 +31,7 @@ jobs:
       - name: Derive ARCH and prepare out dir
         id: vars
         run: |
-          ARCH="${{ matrix.platform }}"
-          ARCH="${ARCH##*/}"        # linux/amd64 -> amd64
+          ARCH="${{ matrix.platform##*/ }}"   # linux/amd64 -> amd64
           echo "ARCH=$ARCH" >> $GITHUB_OUTPUT
           mkdir -p /tmp/out
 
@@ -43,14 +42,19 @@ jobs:
           file: ./Dockerfile
           platforms: ${{ matrix.platform }}
           push: false
-          outputs: type=docker,dest=/tmp/out/serenity-${{ steps.vars.outputs.ARCH }}.tar
+          # Image names baked into the tar
+          tags: |
+            serenityjs:latest
+            serenityjs:${{ steps.vars.outputs.ARCH }}
+          # One tar per arch, loadable via `docker load -i`
+          outputs: type=docker,dest=/tmp/out/serenityjs-${{ steps.vars.outputs.ARCH }}.tar
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Upload image tar
         uses: actions/upload-artifact@v4
         with:
-          name: serenity-image-${{ steps.vars.outputs.ARCH }}
-          path: /tmp/out/serenity-${{ steps.vars.outputs.ARCH }}.tar
+          name: serenityjs-image-${{ steps.vars.outputs.ARCH }}
+          path: /tmp/out/serenityjs-${{ steps.vars.outputs.ARCH }}.tar
           compression-level: 0
           retention-days: 7
