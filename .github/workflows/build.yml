@@ -32,13 +32,9 @@ jobs:
         id: vars
         shell: bash
         run: |
-          # Extract just the arch (linux/amd64 -> amd64)
-          ARCH="${{ matrix.platform }}"
+          # matrix.platform looks like "linux/amd64" or "linux/arm64"
+          ARCH="${{ matrix.platform }}"     # -> amd64 or arm64
           echo "ARCH=$ARCH" >> "$GITHUB_OUTPUT"
-          # Optional: also a hyphenated platform (linux/amd64 -> linux-amd64) if you ever want it
-          PF="${{ matrix.platform }}"
-          PF="${PF//\//-}"
-          echo "PLATFORM_HYPHEN=$PF" >> "$GITHUB_OUTPUT"
           mkdir -p /tmp/out
 
       - name: Build image → tar (single-platform)
@@ -46,16 +42,19 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
-          platforms: ${{ matrix.platform }}
+          platforms: ${{ matrix.platform }}   # keep full platform here (OK)
           push: false
-          # Give the image a stable name/tag INSIDE the tar
+          # ✅ VALID tags (no slashes in the tag part)
           tags: |
             serenityjs:latest
             serenityjs:${{ steps.vars.outputs.ARCH }}
-          # IMPORTANT: no slashes in dest filename
+          # ✅ VALID output path (no slashes from platform)
           outputs: type=docker,dest=/tmp/out/serenityjs-${{ steps.vars.outputs.ARCH }}.tar
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Verify tar exists
+        run: ls -l /tmp/out
 
       - name: Upload image tar
         uses: actions/upload-artifact@v4
