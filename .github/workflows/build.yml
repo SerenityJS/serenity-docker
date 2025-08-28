@@ -1,17 +1,13 @@
-name: Build Docker image (CI)
+name: Build Docker Image (multi-arch) and Upload Artifacts
 
 on:
   push:
     branches: [ main ]
   pull_request:
-  workflow_dispatch:
-
-permissions:
-  contents: read
 
 jobs:
-  build:
-    name: Build ${{ matrix.platform }}
+  build-per-arch:
+    name: Build (${{ matrix.platform }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -22,63 +18,39 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup QEMU
+      # Enable emulation so we can cross-build arm64 on x86 runners, etc.
+      - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: Setup Buildx
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Derive a slash-free arch string and prepare output dir
-      - name: Derive ARCH and prepare out dir
-        id: vars
-        shell: bash
-        run: |
-          ARCH="${{ matrix.platform }}"   # "linux/amd64" -> "amd64"
-          echo "ARCH=$ARCH" >> "$GITHUB_OUTPUT"
-          mkdir -p /tmp/out
-
-      # Generate VALID tags (no slashes) using metadata-action
-      - name: Docker metadata (tags)
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: serenityjs
-          tags: |
-            type=raw,value=latest
-            type=raw,value=${{ steps.vars.outputs.ARCH }}
-
-      # Optional: sanity check to fail fast if any tag has a slash
-      - name: Check tags contain no slashes
-        shell: bash
-        run: |
-          echo "Tags:"
-          echo "${{ steps.meta.outputs.tags }}"
-          if echo "${{ steps.meta.outputs.tags }}" | grep -q '/'; then
-            echo "ERROR: A tag contains '/'."
-            exit 1
-          fi
-
-      - name: Build image → tar (single-platform)
-        uses: docker/build-push-action@v5
+      # Build a SINGLE platform at a time and export a Docker-archive TAR.
+      # NOTE: multi-platform cannot be exported as a single local docker archive,
+      # so we export one .tar per platform and upload both as artifacts.
+      - name: Build ${{ matrix.platform }} → tar
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
-          platforms: ${{ matrix.platform }}     # OK to use full platform here
-          push: false
-          # Use the tags computed above (latest + amd64/arm64)
-          tags: ${{ steps.meta.outputs.tags }}
-          # Export to a fixed, safe file (no slashes)
-          outputs: type=docker,dest=/tmp/out/serenityjs-${{ steps.vars.outputs.ARCH }}.tar
+          platforms: ${{ matrix.platform }}
+          pull: true
+          # Use a normal, slash-free tag. Avoid invalid tags like "serenityjs:linux/amd64".
+          tags: serenityjs:latest
+          # Export to a Docker archive tar for THIS platform
+          outputs: type=docker,dest=/tmp/serenityjs-${{ matrix.platform == 'linux/amd64' && 'linux-amd64' || 'linux-arm64' }}.tar
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Verify output
-        run: ls -l /tmp/out
+      # (Optional) Sanity check: ensure tar can be loaded (doesn't run the image)
+      - name: Load tar to validate
+        run: |
+          docker load -i /tmp/serenityjs-${{ matrix.platform == 'linux/amd64' && 'linux-amd64' || 'linux-arm64' }}.tar
+          docker images | grep serenityjs
 
-      - name: Upload image tar
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: serenityjs-image-${{ steps.vars.outputs.ARCH }}
-          path: /tmp/out/serenityjs-${{ steps.vars.outputs.ARCH }}.tar
-          compression-level: 0
-          retention-days: 7
+          name: serenityjs-${{ matrix.platform == 'linux/amd64' && 'linux-amd64' || 'linux-arm64' }}
+          path: /tmp/serenityjs-${{ matrix.platform == 'linux/amd64' && 'linux-amd64' || 'linux-arm64' }}.tar
+          if-no-files-found: error
