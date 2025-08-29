@@ -1,4 +1,4 @@
-name: Publish Docker Image (multi-arch)
+name: Publish Docker Image
 
 on:
   push:
