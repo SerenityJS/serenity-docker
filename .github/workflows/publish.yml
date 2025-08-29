@@ -1,20 +1,19 @@
-name: Publish Docker Image
+name: Publish Docker Image (multi-arch)
 
 on:
   push:
     branches: [ main ]
-    tags: [ 'v*', 'release-*' ]   # pushes versioned tags too
+    tags: [ 'v*', 'release-*' ]
   workflow_dispatch:
 
 permissions:
   contents: read
-  packages: write  # needed for GHCR
+  packages: write
 
 jobs:
   publish-ghcr:
     name: Publish to GHCR
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,11 +31,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Generates tags and labels:
-      # - latest on default branch
-      # - the git tag for tag pushes
-      # - branch name for branch pushes
-      # - sha tag
       - name: Docker meta (GHCR)
         id: meta
         uses: docker/metadata-action@v5
@@ -60,30 +54,45 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # Optional: also push to Docker Hub if creds provided
   publish-dockerhub:
     name: Publish to Docker Hub (optional)
     needs: publish-ghcr
-    if: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Check presence of secrets at STEP level (allowed)
+      - name: Check Docker Hub secrets
+        id: dh
+        env:
+          DH_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+          DH_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          if [ -z "$DH_USER" ] || [ -z "$DH_TOKEN" ]; then
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "Docker Hub secrets not found; skipping publish."
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up QEMU
+        if: steps.dh.outputs.present == 'true'
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
+        if: steps.dh.outputs.present == 'true'
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Docker Hub
+        if: steps.dh.outputs.present == 'true'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Docker meta (Docker Hub)
+        if: steps.dh.outputs.present == 'true'
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -95,6 +104,7 @@ jobs:
             type=sha
 
       - name: Build & Push (multi-arch)
+        if: steps.dh.outputs.present == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
