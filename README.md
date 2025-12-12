@@ -16,8 +16,8 @@
     <a href="https://github.com/SerenityJS/docker/blob/develop/LICENSE">
       <img alt="License" src="https://img.shields.io/github/license/SerenityJS/docker?style=for-the-badge&label=Liscense&color=hotpink">
     <a/>
-    <a href="https://www.npmjs.com/package/@serenityjs/launcher">
-      <img alt="License" src="https://img.shields.io/npm/v/@serenityjs/launcher?style=for-the-badge&label=NPM&logo=npm&logoColor=white">
+    <a href="https://www.npmjs.com/package/@serenityjs/core">
+      <img alt="License" src="https://img.shields.io/npm/v/@serenityjs/core?style=for-the-badge&label=NPM&logo=npm&logoColor=white">
     <a/>
   </p>
 </p>
@@ -34,7 +34,7 @@ Before you begin, ensure you have met the following requirements:
 
 ## Quick Start
 ```sh
-docker run ghcr.io/serenityjs/serenity-docker:latest -it --name serenityjs-docker -v data:/data -p 19132:19132
+docker run ghcr.io/serenityjs/serenityjs:latest -it --name serenityjs -v data:/data -p 19132:19132
 ```
 
 > [!NOTE]
