@@ -1,6 +1,7 @@
 name: Build Docker Image (multi-arch) and Upload Artifacts
 
 on:
+  workflow_dispatch: {}
   push:
     branches: [ main ]
   pull_request:
