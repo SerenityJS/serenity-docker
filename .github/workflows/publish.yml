@@ -6,7 +6,6 @@ on:
     branches: [ main ]
     tags: [ "v*", "release-*" ]
 
-# Required for GHCR push with GITHUB_TOKEN (and still fine if using a PAT)
 permissions:
   contents: read
   packages: write
@@ -19,7 +18,6 @@ jobs:
     name: Publish to GHCR
     runs-on: ubuntu-latest
 
-    # Re-declare at job-level (helps avoid permission surprises in some setups)
     permissions:
       contents: read
       packages: write
@@ -34,13 +32,13 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Uses GHCR_PAT if you add it, otherwise falls back to GITHUB_TOKEN
+      # IMPORTANT: Requires GHCR_PAT secret (PAT classic with read:packages + write:packages)
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.GHCR_PAT }}
 
       - name: Docker meta (GHCR)
         id: meta
